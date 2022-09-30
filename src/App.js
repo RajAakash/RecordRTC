@@ -14,14 +14,19 @@ const App = () => {
       .then(async function (stream) {
         var recorder = RecordRTC(stream, {
           type: "video",
-          timeSlice: 1000,
+          timeSlice: 15000,
+          ondataavailable: function (blob) {
+            invokeSaveAsDialog(blob);
+          },
         });
+
         console.log("RECORDER", recorder);
         recorder.startRecording();
 
         setRecorder(recorder);
         setStream(stream);
 
+        //I don't know what is the use of this
         const sleep = (m) => new Promise((r) => setTimeout(r, m));
         await sleep(15000);
 
