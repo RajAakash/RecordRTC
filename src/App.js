@@ -3,9 +3,10 @@ import RecordRTC, { invokeSaveAsDialog } from "recordrtc";
 
 const App = () => {
   const [recorder, setRecorder] = useState();
+  const [stream, setStream] = useState();
 
   const startRecording = () => {
-    navigator.mediaDevices
+    const stream = navigator.mediaDevices
       .getUserMedia({
         video: true,
         audio: true,
@@ -19,6 +20,7 @@ const App = () => {
         recorder.startRecording();
 
         setRecorder(recorder);
+        setStream(stream);
 
         const sleep = (m) => new Promise((r) => setTimeout(r, m));
         await sleep(15000);
@@ -33,6 +35,11 @@ const App = () => {
     recorder.stopRecording(function () {
       let blob = recorder.getBlob();
       invokeSaveAsDialog(blob);
+
+      stream.getTracks().forEach(function (track) {
+        track.stop();
+        console.log("STOP hune", stream);
+      });
     });
   };
 
