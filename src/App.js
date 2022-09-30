@@ -1,7 +1,9 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import RecordRTC, { invokeSaveAsDialog } from "recordrtc";
 
 const App = () => {
+  const [recorder, setRecorder] = useState();
+
   const startRecording = () => {
     navigator.mediaDevices
       .getUserMedia({
@@ -13,7 +15,10 @@ const App = () => {
           type: "video",
           timeSlice: 1000,
         });
+        console.log("RECORDER", recorder);
         recorder.startRecording();
+
+        setRecorder(recorder);
 
         const sleep = (m) => new Promise((r) => setTimeout(r, m));
         await sleep(15000);
@@ -25,17 +30,8 @@ const App = () => {
       });
   };
   const stopRecording = async () => {
-    let stream = MediaDevices.getUserMedia({
-      video: true,
-      audio: true,
-    }).then(async function (stream) {
-      var recorder = RecordRTC(stream, {
-        type: "video",
-        timeSlice: 1000,
-      });
-
-      await recorder.stopRecording();
-      let blob = await recorder.getBlob();
+    recorder.stopRecording(function () {
+      let blob = recorder.getBlob();
       invokeSaveAsDialog(blob);
     });
   };
