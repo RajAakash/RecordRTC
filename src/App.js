@@ -1,25 +1,51 @@
-import logo from './logo.svg';
-import './App.css';
+import React, { useEffect } from "react";
+import RecordRTC, { invokeSaveAsDialog } from "recordrtc";
 
-function App() {
+const App = () => {
+  const startRecording = () => {
+    navigator.mediaDevices
+      .getUserMedia({
+        video: true,
+        audio: true,
+      })
+      .then(async function (stream) {
+        var recorder = RecordRTC(stream, {
+          type: "video",
+          timeSlice: 1000,
+        });
+        recorder.startRecording();
+
+        const sleep = (m) => new Promise((r) => setTimeout(r, m));
+        await sleep(15000);
+
+        // recorder.stopRecording(function () {
+        //   let blob = recorder.getBlob();
+        //   invokeSaveAsDialog(blob);
+        // });
+      });
+  };
+  const stopRecording = async () => {
+    let stream = MediaDevices.getUserMedia({
+      video: true,
+      audio: true,
+    }).then(async function (stream) {
+      var recorder = RecordRTC(stream, {
+        type: "video",
+        timeSlice: 1000,
+      });
+
+      await recorder.stopRecording();
+      let blob = await recorder.getBlob();
+      invokeSaveAsDialog(blob);
+    });
+  };
+
   return (
-    <div className="App">
-      <header className="App-header">
-        <img src={logo} className="App-logo" alt="logo" />
-        <p>
-          Edit <code>src/App.js</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
-      </header>
+    <div>
+      <button onClick={startRecording}> Start recording</button>
+      <button onClick={stopRecording}> Stop recording</button>
     </div>
   );
-}
+};
 
 export default App;
