@@ -1,57 +1,91 @@
-import React, { useEffect, useState } from "react";
-import RecordRTC, { invokeSaveAsDialog } from "recordrtc";
+import React, { useEffect, useRef, useState } from "react";
+import RecordRTC from "recordrtc";
+import { io } from "socket.io-client";
+import { appendBuffer } from "./utils/AppendBuffer";
+import { ArrayBufferToBlob } from "./utils/ArrayBufferToBlob";
+import { BlobtoArrayBuffer } from "./utils/BlobToArrayBuffer";
 
 const App = () => {
-  const [recorder, setRecorder] = useState();
-  const [stream, setStream] = useState();
+  const recorder = useRef(null);
+  const myVideoRef = useRef(null);
+  const socket = useRef(null);
+  const playbackRef = useRef(null);
+  const [halted, setHalted] = useState(false);
+  const [chunk, setChunk] = useState([]);
 
-  const startRecording = () => {
-    const stream = navigator.mediaDevices
-      .getUserMedia({
-        video: true,
-        audio: true,
-      })
-      .then(async function (stream) {
-        var recorder = RecordRTC(stream, {
-          type: "video",
-          timeSlice: 15000,
-          ondataavailable: function (blob) {
-            invokeSaveAsDialog(blob);
-          },
-        });
+  useEffect(() => {
+    socket.current = io("http://localhost:4000");
+  }, []);
 
-        console.log("RECORDER", recorder);
-        recorder.startRecording();
-
-        setRecorder(recorder);
-        setStream(stream);
-
-        //I don't know what is the use of this
-        const sleep = (m) => new Promise((r) => setTimeout(r, m));
-        await sleep(15000);
-
-        // recorder.stopRecording(function () {
-        //   let blob = recorder.getBlob();
-        //   invokeSaveAsDialog(blob);
-        // });
+  useEffect(() => {
+    if (!halted && chunk.length > 1) {
+      playbackRef.current.src = URL.createObjectURL(
+        ArrayBufferToBlob(chunk[0])
+      );
+      playbackRef.current.play();
+      setHalted(false);
+    }
+    if (chunk.length > 2) {
+      let chunks = chunk.slice(1);
+      setChunk(chunks);
+    }
+    if (socket.current) {
+      socket.current.on("stream", (ch) => {
+        setChunk((prev) => [...prev, ch]);
       });
+    }
+  }, [socket, chunk, halted]);
+  const onEnded = () => {
+    playbackRef.current.src = URL.createObjectURL(ArrayBufferToBlob(chunk[1]));
+    playbackRef.current.play();
+  };
+
+  const [stream, setStream] = useState(null);
+  const startRecording = async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: false,
+      audio: true,
+    });
+    setStream(stream);
+    myVideoRef.current.srcObject = stream;
+
+    window.stream = stream;
+    var rec = RecordRTC(stream, {
+      type: "video/webm;codecs=vp9",
+      timeSlice: 5000,
+      ondataavailable: async function (blob) {
+        const arrayBuffer = await BlobtoArrayBuffer(blob);
+        socket.current.emit("buffer", arrayBuffer);
+      },
+    });
+
+    rec.startRecording();
+    recorder.current = rec;
   };
   const stopRecording = async () => {
-    recorder.stopRecording(function () {
-      let blob = recorder.getBlob();
-      invokeSaveAsDialog(blob);
-
-      stream.getTracks().forEach(function (track) {
+    recorder.current.stopRecording(async function () {
+      let blob = recorder.current.getBlob();
+      const arrayBuffer = await BlobtoArrayBuffer(blob);
+      socket.current.emit("buffer", arrayBuffer);
+      for (const track of stream.getTracks()) {
         track.stop();
-        console.log("STOP hune", stream);
-      });
+      }
+      recorder.current = null;
     });
   };
 
   return (
     <div>
-      <button onClick={startRecording}> Start recording</button>
-      <button onClick={stopRecording}> Stop recording</button>
+      <p>Hello</p>
+      {!recorder.current ? (
+        <button onClick={startRecording}> Start recording</button>
+      ) : (
+        <button onClick={stopRecording}> Stop recording</button>
+      )}
+      <h2>My Preview</h2>
+      <video ref={myVideoRef} autoPlay controls muted></video>
+
+      <video ref={playbackRef} controls onEnded={onEnded}></video>
     </div>
   );
 };
